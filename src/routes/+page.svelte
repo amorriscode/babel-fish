@@ -11,6 +11,6 @@
 	}
 </script>
 
-<h1>babel fish</h1>
+<h1 class="text-3xl font-bold">babel fish</h1>
 
 <button on:click={createRoom}>create room</button>

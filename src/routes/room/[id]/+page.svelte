@@ -137,7 +137,7 @@
 	}
 </script>
 
-<h1>babel fish</h1>
+<h1 class="text-3xl font-bold">babel fish</h1>
 
 <select bind:value={selectedLanguage}>
 	{#each languageOptions as language}
