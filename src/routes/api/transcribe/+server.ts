@@ -7,7 +7,7 @@ export async function POST({ request, platform }) {
 	const audio = data.get('audio');
 
 	if (!audio || !(audio instanceof File)) {
-		throw new Error('Failed to get audio from request');
+		return new Response('Bad Request', { status: 400 });
 	}
 
 	const input = {

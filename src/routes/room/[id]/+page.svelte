@@ -8,6 +8,7 @@
 		userId: string;
 		userName: string;
 		content: string;
+		translatedContent?: string;
 		language: string;
 	};
 
@@ -16,7 +17,7 @@
 	let ws: WebSocket | undefined;
 	let chunks: any[] = [];
 	let mediaRecorder: MediaRecorder | undefined;
-	let spokenLanguage = 'english';
+	let selectedLanguage = 'english';
 	let messages: Message[] = [];
 	const languageOptions = [
 		'mandarin',
@@ -41,13 +42,28 @@
 			console.log('WebSocket connection established');
 		});
 
-		ws.addEventListener('message', (event) => {
-			console.log({ event });
+		ws.addEventListener('message', async (event) => {
 			const message = JSON.parse(event.data);
 			const messageExists = messages.find(({ id }) => id === message.id);
 
 			if (!messageExists) {
-				messages = [...messages, message];
+				let translatedContent;
+
+				if (message.language !== selectedLanguage) {
+					const body = new FormData();
+					body.append('text', message.content);
+					body.append('sourceLang', message.language);
+					body.append('targetLang', selectedLanguage);
+
+					const response = await fetch('/api/translate', {
+						method: 'POST',
+						body
+					});
+
+					translatedContent = await response.text();
+				}
+
+				messages = [...messages, { ...message, translatedContent }];
 			}
 		});
 
@@ -123,7 +139,7 @@
 
 <h1>babel fish</h1>
 
-<select bind:value={spokenLanguage}>
+<select bind:value={selectedLanguage}>
 	{#each languageOptions as language}
 		<option>{language}</option>
 	{/each}
@@ -139,7 +155,7 @@
 	{#each messages as message}
 		<div>
 			<div>{message.userId} - {message.userName}</div>
-			<div>{message.content}</div>
+			<div>{message.translatedContent ?? message.content}</div>
 		</div>
 	{/each}
 </div>

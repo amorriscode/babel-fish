@@ -9,7 +9,7 @@ export async function POST({ request, platform }) {
 	const message = data.get('message');
 
 	if (!message) {
-		throw new Error('Failed to get message from request');
+		return new Response('Bad Request', { status: 400 });
 	}
 
 	const messages = [
