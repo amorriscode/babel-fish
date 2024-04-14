@@ -64,21 +64,23 @@
 				body.append('text', message.content);
 				body.append('sourceLang', message.language);
 				body.append('targetLang', selectedLanguage);
-
 				const response = await fetch('/api/translate', {
 					method: 'POST',
 					body
 				});
-
 				translatedContent = await response.text();
 			}
 
-			let newMessage: Message;
 			if (existingMessage) {
-				updateMessage(existingMessage.id, {
-					content: `${existingMessage.content} ${message.content}`,
-					translatedContent: `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${translatedContent}`
-				});
+				const updatedContent: Partial<Message> = {
+					content: `${existingMessage.content} ${message.content}`
+				};
+
+				if (translatedContent) {
+					updatedContent.translatedContent = `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${translatedContent}`;
+				}
+
+				updateMessage(existingMessage.id, updatedContent);
 			} else {
 				addMessage({ ...message, translatedContent });
 			}
@@ -119,6 +121,11 @@
 		});
 		const content = await transcribeResponse.text();
 
+		// hack: quiet audio sometimes shows up as 'you' or 'MBC 뉴스 김정은입니다'
+		if (content === 'you' || content.includes('MBC 뉴스 김정은입니다')) {
+			return;
+		}
+
 		const isExistingMessage = messages.find(({ id }) => id === messageId);
 
 		if (isExistingMessage) {
@@ -141,7 +148,7 @@
 			});
 		}
 
-		broadcastMessage(messageId);
+		broadcastMessage(messageId, content);
 	}
 
 	async function handleStartTalking() {
@@ -187,13 +194,36 @@
 		messages = messages.map((message) =>
 			message.id === id ? { ...message, ...updatedMessage } : message
 		);
-		// messages = messages;
 	}
 
-	function broadcastMessage(messageId: string) {
+	// This is a terrible hack because I don't have time to learn Svelte
+	// enough to properly maintain the messages array, sorry Rich
+	function combineMessages(messages: Message[]) {
+		const m = new Map<string, Message>();
+
+		for (const message of messages) {
+			if (m.has(message.id)) {
+				const existingMessage = m.get(message.id)!;
+
+				// Merge content
+				existingMessage.content = `${existingMessage.content} ${message.content}`;
+				if (message.translatedContent) {
+					existingMessage.translatedContent = `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${message.translatedContent}`;
+				}
+
+				m.set(message.id, existingMessage);
+			} else {
+				m.set(message.id, message);
+			}
+		}
+
+		return Array.from(m.values());
+	}
+
+	function broadcastMessage(messageId: string, content: string) {
 		const messageToSend = messages.find(({ id }) => id === messageId);
 		if (messageToSend) {
-			ws?.send(JSON.stringify(messageToSend));
+			ws?.send(JSON.stringify({ id: messageToSend.id, content, language: messageToSend.language }));
 		}
 	}
 
@@ -226,7 +256,7 @@
 {/if}
 
 <div>
-	{#each messages as message}
+	{#each combineMessages(messages) as message}
 		<div>
 			<div>{message.id}</div>
 			<div>{message.translatedContent ?? message.content}</div>
