@@ -1,8 +1,10 @@
-# babel_fish
+# babel_fish <><
 
 > *This is a submission for the [Cloudflare AI Challenge](https://dev.to/devteam/join-us-for-the-cloudflare-ai-challenge-3000-in-prizes-5f99).*
 
 babel_fish is a real time language translation app built with Cloudflare, Svelte, and multiple language models. The app allows you to share a room with your friends in different languages. All messages get translated to your chosen language in real time!
+
+This repo contains the Svelte frontend which includes API routes for interacting with the AI. The chat engine is handled by [the backend](https://github.com/amorriscode/babel-fish-ws).
 
 Built with:
 
@@ -11,21 +13,25 @@ Built with:
 - 🤖 Cloudflare Workers AI
 - 📣 ElevenLabs
 
-## Requirements
+## 🚧 Requirements
 
-- An ElevenLabs API key
+- An [ElevenLabs](https://elevenlabs.io/) API key
 - A running version of [the backend](https://github.com/amorriscode/babel-fish-ws)
 
-## Development
+## 🛠️ Development
 
-1. Clone the frontend
+1. Create an `.env` file and fill in the variables
+
+    `cp .env.example .env`
+
+2. Clone the frontend
 
     `git clone https://github.com/amorriscode/babel-fish`
 
-2. Install dependencies
+3. Install dependencies
 
     `npm install`
 
-3. Run the dev server
+4. Run the dev server
 
     `npm run wdev`
