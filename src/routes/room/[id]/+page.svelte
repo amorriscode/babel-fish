@@ -75,11 +75,12 @@
 	});
 
 	async function generateVoice(message: Message) {
-		if (!message.translatedContent) {
+		const generatedMessage = message.translatedContent ?? message.content;
+		if (!generatedMessage) {
 			return;
 		}
 		const translatedContentBody = new FormData();
-		translatedContentBody.append('message', message.translatedContent);
+		translatedContentBody.append('message', generatedMessage);
 		const generateResponse = await fetch('/api/generate', {
 			method: 'POST',
 			body: translatedContentBody
