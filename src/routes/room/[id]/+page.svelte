@@ -6,6 +6,7 @@
 	import { throttle } from 'lodash-es';
 
 	import MessageBubble from '../../../components/message-bubble.svelte';
+	import { convertCodeToLabel, LANGUAGE_OPTIONS, type CountryCode } from '../../../utils';
 
 	const fish = `<><`;
 
@@ -24,27 +25,13 @@
 		timestamp: string;
 	};
 
-	const LANGUAGE_OPTIONS = [
-		{ label: 'arabic', value: 'ar' },
-		{ label: 'bengali', value: 'bn' },
-		{ label: 'chinese', value: 'zh' },
-		{ label: 'english', value: 'en' },
-		{ label: 'german', value: 'de' },
-		{ label: 'hindi', value: 'hi' },
-		{ label: 'japanese', value: 'ja' },
-		{ label: 'portugese', value: 'pt' },
-		{ label: 'punjabi', value: 'pa' },
-		{ label: 'russian', value: 'ru' },
-		{ label: 'spanish', value: 'es' }
-	];
-
 	const roomId = $page.params.id;
 	let userId: string;
 	let userName: string;
 
 	let ws: WebSocket | undefined;
 
-	let selectedLanguage = 'english';
+	let selectedLanguage: CountryCode = 'en';
 
 	let messages: Message[] = [];
 	let messageQueue: QueueItem[] = [];
@@ -347,7 +334,7 @@
 			<div>get responses in</div>
 			<select bind:value={selectedLanguage} class="text-sm p-2">
 				{#each LANGUAGE_OPTIONS as language}
-					<option id={language.value}>{language.label}</option>
+					<option id={language} value={language}>{convertCodeToLabel(language)}</option>
 				{/each}
 			</select>
 		</div>
