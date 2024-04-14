@@ -15,7 +15,7 @@ export async function POST({ request, platform }) {
 	const messages = [
 		{
 			role: 'system',
-			content: dedent`You are an expert language detector. When given a message you respond with the language it is in.
+			content: dedent`You are an expert language detector. When given a message you respond in a single word with the lanugage.
       
       MESSAGE:
       How do you do today?

@@ -54,16 +54,18 @@
 					body.append('text', message.content);
 					body.append('sourceLang', message.language);
 					body.append('targetLang', selectedLanguage);
-
+					
 					const response = await fetch('/api/translate', {
 						method: 'POST',
 						body
 					});
-
+					
 					translatedContent = await response.text();
 				}
-
-				messages = [...messages, { ...message, translatedContent }];
+				const newMessage = { ...message, translatedContent };
+				messages = [...messages, newMessage];
+				
+				await generateVoice(newMessage);
 			}
 		});
 
@@ -71,6 +73,23 @@
 			console.log('WebSocket connection closed');
 		});
 	});
+
+	async function generateVoice(message: Message) {
+		if (!message.translatedContent) {
+			return
+		}
+		const translatedContentBody = new FormData();
+		translatedContentBody.append('message', message.translatedContent);
+		const generateResponse = await fetch('/api/generate', {
+			method: 'POST',
+			body:translatedContentBody 
+		});
+		const audioBlob = await generateResponse.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    const audioElement = new Audio(audioUrl);
+    audioElement.play();
+	}
 
 	async function transcribe(audio: Blob) {
 		if (!userId) {

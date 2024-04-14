@@ -1,5 +1,3 @@
-import dedent from 'dedent';
-
 export async function POST({ request, platform }) {
 	if (!platform?.env?.AI) {
 		throw new Error('Cloudflare AI not available');
