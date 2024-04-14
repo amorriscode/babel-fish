@@ -1,5 +1,6 @@
+import { VOICE_API_KEY, VOICE_ID } from '$env/static/private';
+
 export async function POST({ request, platform }) {
-	const { VITE_VOICE_API_KEY, VITE_VOICE_ID } = import.meta.env;
 	const data = await request.formData();
 	const message = data.get('message');
 
@@ -7,10 +8,10 @@ export async function POST({ request, platform }) {
 		return new Response('Bad Request', { status: 400 });
 	}
 
-	const url = `https://api.elevenlabs.io/v1/text-to-speech/${VITE_VOICE_ID}`;
+	const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
 	const headers = {
 		'Content-Type': 'application/json',
-		'xi-api-key': VITE_VOICE_API_KEY
+		'xi-api-key': VOICE_API_KEY
 	};
 
 	const options = {
