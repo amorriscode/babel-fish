@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-body { 
-  @apply bg-blue-400;
-  font-family: 'Press Start 2P', system-ui;;
+body {
+	@apply bg-blue-400;
+	font-family: 'Press Start 2P', system-ui;
 }
