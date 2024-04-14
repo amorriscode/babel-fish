@@ -45,6 +45,8 @@
 	let audioWorkletNode: AudioWorkletNode | undefined;
 	let microphoneMediaStreamSource: MediaStreamAudioSourceNode | undefined;
 
+	let copyText = 'copy room link';
+
 	onMount(async () => {
 		userId = crypto.randomUUID();
 		userName = uniqueNamesGenerator({
@@ -270,50 +272,67 @@
 			}
 		}
 	}
+
+	function handleRoomUrlCopy() {
+		navigator.clipboard.writeText(window.location.href);
+		copyText = 'copied!';
+
+		setTimeout(() => {
+			copyText = 'copy room link';
+		}, 3000);
+	}
 </script>
-
-<div class="p-4 flex justify-between">
-	<h1 class="text-2xl">babel_fish</h1>
-
-	<div class="flex items-center gap-4">
-		<div>get responses in</div>
-		<select bind:value={selectedLanguage} class="text-sm p-2">
-			{#each LANGUAGE_OPTIONS as language}
-				<option id={language.value}>{language.label}</option>
-			{/each}
-		</select>
-	</div>
-</div>
 
 <svelte:window on:keydown|preventDefault={handleKeyDown} />
 
-<div class="flex w-full">
-	{#if !isTalking}
-		<button
-			on:click={handleStartTalking}
-			class="bg-rose-500 hover:bg-rose-600 text-4xl p-4 text-white w-full">start talking</button
-		>
-	{:else}
-		<button
-			on:click={handleStopTalking}
-			class="bg-purple-500 hover:bg-purple-600 text-4xl p-4 text-white w-full">stop talking</button
-		>
-	{/if}
-</div>
+<div class="h-screen overflow-hidden">
+	<div class="p-4 flex justify-between">
+		<h1 class="text-2xl">babel_fish</h1>
 
-<div>
-	{#if !messages.length}
-		<div class="w-2/3 mx-auto text-center mt-20 text-6xl tracking-[-0.5em]">
-			{fish}
+		<div class="flex items-center gap-4">
+			<div>get responses in</div>
+			<select bind:value={selectedLanguage} class="text-sm p-2">
+				{#each LANGUAGE_OPTIONS as language}
+					<option id={language.value}>{language.label}</option>
+				{/each}
+			</select>
 		</div>
-		<div class="w-2/3 mx-auto text-center mt-8 text-2xl">
-			It's lonely in here. Why don't you say something?
-		</div>
-	{/if}
+	</div>
 
-	<div class="space-y-4 p-4">
-		{#each combineMessages(messages) as message}
-			<MessageBubble {message} isUser={message.userId === userId} />
-		{/each}
+	<div class="flex w-full">
+		{#if !isTalking}
+			<button
+				on:click={handleStartTalking}
+				class="bg-rose-500 hover:bg-rose-600 text-4xl p-4 text-white w-full">start talking</button
+			>
+		{:else}
+			<button
+				on:click={handleStopTalking}
+				class="bg-purple-500 hover:bg-purple-600 text-4xl p-4 text-white w-full"
+				>stop talking</button
+			>
+		{/if}
+	</div>
+
+	<button
+		class="underline decoration-dashed my-2 text-center text-sm text-slate-900/80 hover:text-slate-900/90 w-full"
+		on:click={handleRoomUrlCopy}>{copyText}</button
+	>
+
+	<div class="overflow-y-auto" style="height: calc(100vh - 155px);">
+		{#if !messages.length}
+			<div class="w-2/3 mx-auto text-center mt-20 text-6xl tracking-[-0.5em]">
+				{fish}
+			</div>
+			<div class="w-2/3 mx-auto text-center mt-8 text-2xl">
+				It's lonely in here. Why don't you say something?
+			</div>
+		{/if}
+
+		<div class="space-y-4 p-4">
+			{#each combineMessages(messages) as message}
+				<MessageBubble {message} isUser={message.userId === userId} />
+			{/each}
+		</div>
 	</div>
 </div>

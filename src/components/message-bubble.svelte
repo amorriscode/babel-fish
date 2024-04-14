@@ -24,7 +24,7 @@
 
 <div class={`w-fit max-w-1/3  ${isUser ? '' : 'ml-auto'}`}>
 	{#if message.userName && !isUser}
-		<div class="text-[0.6rem] mb-1 text-right w-full text-gray-700">
+		<div class="text-[0.6rem] mb-1 text-right w-full text-slate-900/80">
 			{message.userName}
 		</div>
 	{/if}
@@ -37,7 +37,7 @@
 
 	{#if message.translatedContent}
 		<button
-			class="text-[0.6rem] underline decoration-dashed mt-1 pr-4 text-right w-full text-slate-700"
+			class="text-[0.6rem] underline decoration-dashed mt-1 pr-4 text-right w-full text-slate-900/80 hover:text-slate-900/90"
 			on:click={switchContent}
 		>
 			translated from {message.language}
