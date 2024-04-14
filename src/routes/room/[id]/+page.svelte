@@ -94,7 +94,7 @@
 				language: sourceLang
 			});
 
-			await generateVoice(translatedContent || content);
+			await generateVoice(sourceLang, translatedContent || content);
 		});
 
 		ws.addEventListener('close', () => {
@@ -102,14 +102,14 @@
 		});
 	});
 
-	async function generateVoice(content: string) {
+	async function generateVoice(language: string, content: string) {
 		if (!content) {
 			return;
 		}
 
 		const translatedContentBody = new FormData();
 		translatedContentBody.append('message', content);
-		translatedContentBody.append('language', selectedLanguage);
+		translatedContentBody.append('language', language);
 		const generateResponse = await fetch('/api/generate', {
 			method: 'POST',
 			body: translatedContentBody
