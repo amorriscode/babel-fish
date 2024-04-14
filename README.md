@@ -1,38 +1,31 @@
-# create-svelte
+# babel_fish
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
+> *This is a submission for the [Cloudflare AI Challenge](https://dev.to/devteam/join-us-for-the-cloudflare-ai-challenge-3000-in-prizes-5f99).*
 
-## Creating a project
+babel_fish is a real time language translation app built with Cloudflare, Svelte, and multiple language models. The app allows you to share a room with your friends in different languages. All messages get translated to your chosen language in real time!
 
-If you're seeing this, you've probably already done this step. Congrats!
+Built with:
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
+- 💅 Svelte
+- ⚙️ Cloudflare Workers
+- 🤖 Cloudflare Workers AI
+- 📣 ElevenLabs
 
-# create a new project in my-app
-npm create svelte@latest my-app
-```
+## Requirements
 
-## Developing
+- An ElevenLabs API key
+- A running version of [the backend](https://github.com/amorriscode/babel-fish-ws)
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Development
 
-```bash
-npm run dev
+1. Clone the frontend
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+    `git clone https://github.com/amorriscode/babel-fish`
 
-## Building
+2. Install dependencies
 
-To create a production version of your app:
+    `npm install`
 
-```bash
-npm run build
-```
+3. Run the dev server
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+    `npm run wdev`
