@@ -241,6 +241,16 @@
 		audioWorkletNode = undefined;
 		isTalking = false;
 	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		if (e.code === 'Space') {
+			if (isTalking) {
+				handleStopTalking();
+			} else {
+				handleStartTalking();
+			}
+		}
+	}
 </script>
 
 <div class="p-4 flex justify-between">
@@ -255,6 +265,8 @@
 		</select>
 	</div>
 </div>
+
+<svelte:window on:keydown|preventDefault={handleKeyDown} />
 
 <div class="flex w-full">
 	{#if !isTalking}
