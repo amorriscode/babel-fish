@@ -12,14 +12,7 @@
 		language: string;
 	};
 
-	const roomId = $page.params.id;
-	let userId: string | undefined;
-	let ws: WebSocket | undefined;
-	let chunks: any[] = [];
-	let mediaRecorder: MediaRecorder | undefined;
-	let selectedLanguage = 'english';
-	let messages: Message[] = [];
-	const languageOptions = [
+	const LANGUAGE_OPTIONS = [
 		'mandarin',
 		'spanish',
 		'english',
@@ -33,7 +26,21 @@
 		'german'
 	];
 
-	onMount(() => {
+	const roomId = $page.params.id;
+	let userId: string | undefined;
+
+	let ws: WebSocket | undefined;
+
+	let selectedLanguage = 'english';
+
+	let messages: Message[] = [];
+
+	let isTalking = false;
+	let audioContext: AudioContext | undefined;
+	let audioWorkletNode: AudioWorkletNode | undefined;
+	let microphoneMediaStreamSource: MediaStreamAudioSourceNode | undefined;
+
+	onMount(async () => {
 		userId = crypto.randomUUID();
 
 		ws = new WebSocket(`wss://${PUBLIC_SOCKET_URL}/api/room/${roomId}/join`);
@@ -44,29 +51,39 @@
 
 		ws.addEventListener('message', async (event) => {
 			const message = JSON.parse(event.data);
-			const messageExists = messages.find(({ id }) => id === message.id);
+			const existingMessage = messages.find(({ id }) => id === message.id);
 
-			if (!messageExists) {
-				let translatedContent;
-
-				if (message.language !== selectedLanguage) {
-					const body = new FormData();
-					body.append('text', message.content);
-					body.append('sourceLang', message.language);
-					body.append('targetLang', selectedLanguage);
-
-					const response = await fetch('/api/translate', {
-						method: 'POST',
-						body
-					});
-
-					translatedContent = await response.text();
-				}
-				const newMessage = { ...message, translatedContent };
-				messages = [...messages, newMessage];
-
-				await generateVoice(newMessage);
+			if (existingMessage?.userId === userId) {
+				return;
 			}
+
+			let translatedContent;
+
+			if (message.language !== selectedLanguage) {
+				const body = new FormData();
+				body.append('text', message.content);
+				body.append('sourceLang', message.language);
+				body.append('targetLang', selectedLanguage);
+
+				const response = await fetch('/api/translate', {
+					method: 'POST',
+					body
+				});
+
+				translatedContent = await response.text();
+			}
+
+			let newMessage: Message;
+			if (existingMessage) {
+				updateMessage(existingMessage.id, {
+					content: `${existingMessage.content} ${message.content}`,
+					translatedContent: `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${translatedContent}`
+				});
+			} else {
+				addMessage({ ...message, translatedContent });
+			}
+
+			await generateVoice(translatedContent || message.content);
 		});
 
 		ws.addEventListener('close', () => {
@@ -74,17 +91,14 @@
 		});
 	});
 
-	async function generateVoice(message: Message) {
-		const generatedMessage = message.translatedContent ?? message.content;
-		if (!generatedMessage) {
-			return;
-		}
+	async function generateVoice(content: string) {
 		const translatedContentBody = new FormData();
-		translatedContentBody.append('message', generatedMessage);
+		translatedContentBody.append('message', content);
 		const generateResponse = await fetch('/api/generate', {
 			method: 'POST',
 			body: translatedContentBody
 		});
+
 		const audioBlob = await generateResponse.blob();
 		const audioUrl = URL.createObjectURL(audioBlob);
 
@@ -92,7 +106,7 @@
 		audioElement.play();
 	}
 
-	async function transcribe(audio: Blob) {
+	async function transcribe(messageId: string, audio: Blob) {
 		if (!userId) {
 			return;
 		}
@@ -105,76 +119,116 @@
 		});
 		const content = await transcribeResponse.text();
 
-		const detectBody = new FormData();
-		detectBody.append('message', content);
-		const detectResponse = await fetch('/api/detect', {
-			method: 'POST',
-			body: detectBody
-		});
-		const language = await detectResponse.text();
+		const isExistingMessage = messages.find(({ id }) => id === messageId);
 
-		const message: Message = {
-			id: crypto.randomUUID(),
-			userId,
-			userName: userId,
-			content,
-			language
+		if (isExistingMessage) {
+			updateMessage(messageId, { content: `${isExistingMessage.content} ${content}` });
+		} else {
+			const detectBody = new FormData();
+			detectBody.append('message', content);
+			const detectResponse = await fetch('/api/detect', {
+				method: 'POST',
+				body: detectBody
+			});
+			const language = await detectResponse.text();
+
+			addMessage({
+				id: messageId,
+				userId,
+				userName: userId,
+				content,
+				language
+			});
+		}
+
+		broadcastMessage(messageId);
+	}
+
+	async function handleStartTalking() {
+		isTalking = true;
+		const messageId = crypto.randomUUID();
+
+		audioContext = new AudioContext();
+		const microphoneMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+		microphoneMediaStreamSource = audioContext.createMediaStreamSource(microphoneMediaStream);
+		await audioContext.audioWorklet.addModule('/worklet.js');
+
+		audioWorkletNode = new AudioWorkletNode(audioContext, 'worklet', {
+			processorOptions: {
+				sampleRate: audioContext.sampleRate
+			}
+		});
+
+		microphoneMediaStreamSource.connect(audioWorkletNode).connect(audioContext.destination);
+
+		audioWorkletNode.port.onmessage = (event) => {
+			switch (event.data.type) {
+				case 'log':
+					console.log(`[WORKLET]: ${event.data.message}`);
+					break;
+				case 'bytes':
+					transcribe(messageId, new Blob([event.data.bytes], { type: 'audio/wav' }));
+					break;
+				case 'stop':
+					handleStopTalking();
+					break;
+				default:
+					console.error(`Unhandled worklet message type ${event.data.type}`);
+			}
 		};
+	}
 
+	function addMessage(message: Message) {
 		messages = [...messages, message];
-
-		ws?.send(JSON.stringify(message));
 	}
 
-	async function startTalking() {
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-		chunks = [];
-		mediaRecorder = new MediaRecorder(stream);
-		mediaRecorder.start(1000);
-
-		mediaRecorder.addEventListener('dataavailable', (event) => {
-			chunks.push(event.data);
-		});
+	function updateMessage(id: string, updatedMessage: Partial<Message>) {
+		messages = messages.map((message) =>
+			message.id === id ? { ...message, ...updatedMessage } : message
+		);
+		// messages = messages;
 	}
 
-	async function stopTalking() {
-		if (!mediaRecorder) {
+	function broadcastMessage(messageId: string) {
+		const messageToSend = messages.find(({ id }) => id === messageId);
+		if (messageToSend) {
+			ws?.send(JSON.stringify(messageToSend));
+		}
+	}
+
+	async function handleStopTalking() {
+		if (!audioContext || !audioWorkletNode || !microphoneMediaStreamSource) {
 			return;
 		}
 
-		mediaRecorder.stop();
+		audioWorkletNode.disconnect(audioContext.destination);
+		microphoneMediaStreamSource.disconnect(audioWorkletNode);
 
-		mediaRecorder.addEventListener('stop', () => {
-			if (!chunks.length) {
-				return;
-			}
-
-			transcribe(new Blob(chunks, { type: 'audio/wav' }));
-		});
-
-		mediaRecorder = undefined;
+		audioContext = undefined;
+		audioWorkletNode = undefined;
+		isTalking = false;
 	}
 </script>
 
 <h1 class="text-3xl font-bold">babel fish</h1>
 
 <select bind:value={selectedLanguage}>
-	{#each languageOptions as language}
+	{#each LANGUAGE_OPTIONS as language}
 		<option>{language}</option>
 	{/each}
 </select>
 
-{#if mediaRecorder === undefined}
-	<button on:click={startTalking}>start talking</button>
+{#if !isTalking}
+	<button on:click={handleStartTalking}>start talking</button>
 {:else}
-	<button on:click={stopTalking}>stop talking</button>
+	<button on:click={handleStopTalking}>stop talking</button>
 {/if}
 
 <div>
 	{#each messages as message}
 		<div>
-			<div>{message.userId} - {message.userName}</div>
+			<div>{message.id}</div>
 			<div>{message.translatedContent ?? message.content}</div>
 		</div>
 	{/each}
