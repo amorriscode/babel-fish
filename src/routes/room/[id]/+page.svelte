@@ -13,17 +13,17 @@
 	};
 
 	const LANGUAGE_OPTIONS = [
-		'mandarin',
-		'spanish',
-		'english',
-		'hindi',
-		'arabic',
-		'bengali',
-		'russian',
-		'portuguese',
-		'japanese',
-		'punjabi',
-		'german'
+		{ label: 'arabic', value: 'ar' },
+		{ label: 'bengali', value: 'bn' },
+		{ label: 'chinese', value: 'zh' },
+		{ label: 'english', value: 'en' },
+		{ label: 'german', value: 'de' },
+		{ label: 'hindi', value: 'hi' },
+		{ label: 'japanese', value: 'ja' },
+		{ label: 'portugese', value: 'pt' },
+		{ label: 'punjabi', value: 'pa' },
+		{ label: 'russian', value: 'ru' },
+		{ label: 'spanish', value: 'es' }
 	];
 
 	const roomId = $page.params.id;
@@ -245,7 +245,7 @@
 
 <select bind:value={selectedLanguage}>
 	{#each LANGUAGE_OPTIONS as language}
-		<option>{language}</option>
+		<option id={language.value}>{language.label}</option>
 	{/each}
 </select>
 

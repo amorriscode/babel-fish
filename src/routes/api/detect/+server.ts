@@ -15,22 +15,35 @@ export async function POST({ request, platform }) {
 	const messages = [
 		{
 			role: 'system',
-			content: dedent`You are an expert language detector. When given a message you respond in a single word with the lanugage.
-      
-      MESSAGE:
-      How do you do today?
-      LANGUAGE:
-      english
-      
-      MESSAGE:
-      Guten tag!
-      LANGUAGE:
-      german
-      `
+			content: dedent`You are an expert with ISO 639 language codes. Given any phrase, you will detect the corresponding ISO 639 code. RESPOND WITH THE TWO LETTER ISO 639 CODE, NOTHING ELSE.`
 		},
 		{
 			role: 'user',
-			content: `MESSAGE:\n${message}\nLANGUAGE:`
+			content: `MESSAGE:\nHow do you do today?\nLANGUAGE_CODE:\n`
+		},
+		{
+			role: 'assistant',
+			content: `en`
+		},
+		{
+			role: 'user',
+			content: `MESSAGE:\nGuten tag!\nLANGUAGE_CODE:\n`
+		},
+		{
+			role: 'assistant',
+			content: `de`
+		},
+		{
+			role: 'user',
+			content: `MESSAGE:\nこんな風に話すのが嫌い\nLANGUAGE_CODE:\n`
+		},
+		{
+			role: 'assistant',
+			content: `ja`
+		},
+		{
+			role: 'user',
+			content: `MESSAGE:\n${message}\nLANGUAGE_CODE:\n`
 		}
 	];
 
@@ -38,5 +51,5 @@ export async function POST({ request, platform }) {
 		messages
 	});
 
-	return new Response(response.trim().toLowerCase());
+	return new Response(response.trim().slice(0, 2).toLowerCase());
 }
