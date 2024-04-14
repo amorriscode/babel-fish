@@ -19,14 +19,18 @@
 </script>
 
 <div class={`w-fit max-w-1/3  ${isUser ? '' : 'ml-auto'}`}>
-	{#if userName && !isUser}
-		<div class="text-[0.6rem] mb-1 text-right w-full text-slate-900/80">
-			{userName}
-		</div>
-	{/if}
-
 	<div class={`bg-white p-4 relative`}>
-		<div>{displayContent}</div>
+		{#if userName && !isUser}
+			<div class="text-[0.6rem] mb-1 text-right w-full text-slate-900/80">
+				{userName}
+			</div>
+		{/if}
+
+		{#if displayContent}
+			<div>{displayContent}</div>
+		{:else}
+			<div class="animate-pulse">. . .</div>
+		{/if}
 
 		<div class={`absolute w-4 h-4 -bottom-2 bg-white ${isUser ? '-left-2' : '-right-2'} `} />
 	</div>

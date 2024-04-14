@@ -140,7 +140,7 @@
 		const content = (await transcribeResponse.text()).trim();
 
 		// hack: quiet audio sometimes shows up as 'you' or 'MBC 뉴스 김정은입니다'
-		if (content === 'you' || content.includes('MBC 뉴스 김정은입니다')) {
+		if (content === 'you' || content.includes('MBC') || content === 'Thank you.') {
 			removeQueueItem(queueItemId);
 			return;
 		}
@@ -212,7 +212,7 @@
 		if (q.length) {
 			processQueue();
 		}
-	}, 250);
+	}, 500);
 
 	async function detectLanguage(content: string) {
 		const detectBody = new FormData();
@@ -254,8 +254,8 @@
 		}
 
 		// If there is content and it is my message then broadcast to the world!
-		if (partialMessage.content && existingMessage.userId === userId) {
-			broadcastMessage(messageId, partialMessage.content);
+		if (existingMessage.userId === userId) {
+			broadcastMessage(messageId, partialMessage.content || '');
 		}
 
 		const updatedMessage: Partial<Message> = {
@@ -373,11 +373,9 @@
 
 		<div class="space-y-4 p-4">
 			{#each messages as message}
-				{#if message.content || message.translatedContent}
-					{#key message.content}
-						<MessageBubble {...message} isUser={message.userId === userId} />
-					{/key}
-				{/if}
+				{#key message.content}
+					<MessageBubble {...message} isUser={message.userId === userId} />
+				{/key}
 			{/each}
 		</div>
 	</div>
