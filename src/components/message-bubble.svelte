@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { convertCodeToLabel } from '../utils';
+
 	export let userName: string;
 	export let content: string | undefined = undefined;
 	export let translatedContent: string | undefined = undefined;
@@ -34,7 +36,7 @@
 			class="text-[0.6rem] underline decoration-dashed mt-1 pr-4 text-right w-full text-slate-900/80 hover:text-slate-900/90"
 			on:click={switchContent}
 		>
-			translated from {language}
+			translated from {convertCodeToLabel(language)}
 		</button>
 	{/if}
 </div>
