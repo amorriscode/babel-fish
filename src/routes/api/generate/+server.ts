@@ -8,10 +8,13 @@ export async function POST({ request, platform }) {
 	if (!message) {
 		return new Response('Bad Request', { status: 400 });
 	}
-	const ID = language === 'zh' ? VOICE_ID_CHINESE : VOICE_ID;
 
-	const url = `http://api.elevenlabs.io/v1/text-to-speech/${ID}`;
-	console.log(url, ID, language);
+	// hack: use a different language so our hackathon demo looks more cool
+	// in the future a user should be able to select the voice that their
+	// messages are spoken as
+	const voiceId = language === 'zh' ? VOICE_ID_CHINESE : VOICE_ID;
+	const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+
 	const headers = {
 		'Content-Type': 'application/json',
 		'xi-api-key': VOICE_API_KEY
