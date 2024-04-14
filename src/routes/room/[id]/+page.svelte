@@ -212,7 +212,7 @@
 		if (q.length) {
 			processQueue();
 		}
-	}, 1000);
+	}, 250);
 
 	async function detectLanguage(content: string) {
 		const detectBody = new FormData();

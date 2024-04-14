@@ -5,9 +5,11 @@ class MyAudioWorklet extends AudioWorkletProcessor {
 		this.audioData = [];
 		this.isCollectingData = true;
 		this.sampleRate = options.processorOptions.sampleRate;
-		this.volumeThreshold = 0.005;
+		this.volumeThreshold = 0.004;
 		this.silenceThreshold = 10;
-		this.stopAudioThreshold = 500;
+		this.stopAudioThreshold = 400;
+		this.lastSendTime = 0;
+		this.sendInterval = 1000;
 	}
 
 	process(inputs, outputs, parameters) {
@@ -32,12 +34,17 @@ class MyAudioWorklet extends AudioWorkletProcessor {
 			this.silentFrames += 1;
 		}
 
-		if (this.silentFrames >= this.silenceThreshold && this.isCollectingData) {
+		// Send audio at regular intervals
+		if (this.currentTime - this.lastSendTime >= this.sendInterval && this.isCollectingDatal) {
 			this.sendAudioData();
-			this.audioData = [];
-			this.isCollectingData = false;
 		}
 
+		// Send audio if we have passed the silence threshold
+		if (this.silentFrames >= this.silenceThreshold && this.isCollectingData) {
+			this.sendAudioData();
+		}
+
+		// Send audio and stop if we have just been sitting in silence
 		if (this.silentFrames >= this.stopAudioThreshold && !this.isCollectingData) {
 			this.sendAudioData();
 			this.port.postMessage({ type: 'stop' });
@@ -73,12 +80,16 @@ class MyAudioWorklet extends AudioWorkletProcessor {
 			});
 
 			this.port.postMessage({ type: 'bytes', bytes });
+			this.lastSendTime = this.currentTime;
 		} catch (error) {
 			this.port.postMessage({
 				type: 'log',
 				message: `Error sending audio data: ${error}`
 			});
 		}
+
+		this.audioData = [];
+		this.isCollectingData = false;
 	}
 
 	getWavBytes(buffer, options) {
