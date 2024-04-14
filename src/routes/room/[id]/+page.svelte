@@ -93,8 +93,6 @@
 				translatedContent,
 				language: sourceLang
 			});
-
-			await generateVoice(sourceLang, translatedContent || content);
 		});
 
 		ws.addEventListener('close', () => {
@@ -102,7 +100,7 @@
 		});
 	});
 
-	async function generateVoice(language: string, content: string) {
+	async function generateVoice(language: string, content?: string) {
 		if (!content) {
 			return;
 		}
@@ -205,6 +203,10 @@
 
 		const { message } = queueItem;
 		if (message?.id && (message?.content || message?.translatedContent)) {
+			if (message.language) {
+				await generateVoice(message.language, message?.translatedContent || message?.content);
+			}
+
 			await updateMessage(message.id, message);
 			messageQueue = q.slice(1);
 		}
