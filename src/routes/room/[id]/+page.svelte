@@ -191,7 +191,7 @@
 	}
 
 	const processQueue = throttle(async () => {
-		if (!messageQueue?.length) {
+		if (!messageQueue.length) {
 			return;
 		}
 
@@ -209,7 +209,7 @@
 			messageQueue = q.slice(1);
 		}
 
-		if (q?.length) {
+		if (q.length) {
 			processQueue();
 		}
 	}, 1000);
@@ -362,7 +362,7 @@
 	>
 
 	<div class="overflow-y-auto" style="height: calc(100vh - 155px);">
-		{#if !messages?.length}
+		{#if !messages.length}
 			<div class="w-2/3 mx-auto text-center mt-20 text-6xl tracking-[-0.5em]">
 				{fish}
 			</div>
