@@ -109,6 +109,7 @@
 
 		const translatedContentBody = new FormData();
 		translatedContentBody.append('message', content);
+		translatedContentBody.append('language', selectedLanguage);
 		const generateResponse = await fetch('/api/generate', {
 			method: 'POST',
 			body: translatedContentBody
