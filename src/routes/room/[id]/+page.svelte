@@ -99,12 +99,15 @@
 				translatedContent = (await response.text()).trim();
 			}
 
+			const content = message.content || existingMessage?.content;
 			updateQueueItem(queueItemId, {
 				...message,
-				content: message.content || existingMessage?.content,
+				content,
 				translatedContent,
 				language: sourceLang
 			});
+
+			await generateVoice(translatedContent || content);
 		});
 
 		ws.addEventListener('close', () => {
@@ -113,6 +116,10 @@
 	});
 
 	async function generateVoice(content: string) {
+		if (!content) {
+			return;
+		}
+
 		const translatedContentBody = new FormData();
 		translatedContentBody.append('message', content);
 		const generateResponse = await fetch('/api/generate', {
