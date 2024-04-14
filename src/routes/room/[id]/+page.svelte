@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { PUBLIC_SOCKET_URL } from '$env/static/public';
 	import { onMount } from 'svelte';
+	import MessageBubble from '../../../components/message-bubble.svelte';
 
 	const fish = `<><`;
 
@@ -294,10 +295,7 @@
 
 	<div class="space-y-4 p-4">
 		{#each combineMessages(messages) as message}
-			<div class="bg-white w-fit max-w-1/3 p-4">
-				<div>{message.id}</div>
-				<div>{message.translatedContent ?? message.content}</div>
-			</div>
+			<MessageBubble {message} isUser={message.userId === userId} />
 		{/each}
 	</div>
 </div>
