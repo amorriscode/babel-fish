@@ -1,46 +1,42 @@
 <script lang="ts">
-	type Message = {
-		id: string;
-		userId: string;
-		userName: string;
-		content: string;
-		translatedContent?: string;
-		language: string;
-	};
-
-	export let message: Message;
+	export let id: string;
+	export let userId: string;
+	export let userName: string;
+	export let content: string | undefined = undefined;
+	export let translatedContent: string | undefined = undefined;
+	export let language: string | undefined = undefined;
 	export let isUser: boolean;
 
-	let content = message.translatedContent ?? message.content;
+	let displayContent = translatedContent || content;
 
 	function switchContent() {
-		if (content === message.content && message.translatedContent) {
-			content = message.translatedContent;
+		if (displayContent === content && translatedContent) {
+			displayContent = translatedContent;
 		} else {
-			content = message.content;
+			displayContent = content;
 		}
 	}
 </script>
 
 <div class={`w-fit max-w-1/3  ${isUser ? '' : 'ml-auto'}`}>
-	{#if message.userName && !isUser}
+	{#if userName && !isUser}
 		<div class="text-[0.6rem] mb-1 text-right w-full text-slate-900/80">
-			{message.userName}
+			{userName}
 		</div>
 	{/if}
 
 	<div class={`bg-white p-4 relative`}>
-		<div>{content}</div>
+		<div>{displayContent}</div>
 
 		<div class={`absolute w-4 h-4 -bottom-2 bg-white ${isUser ? '-left-2' : '-right-2'} `} />
 	</div>
 
-	{#if message.translatedContent}
+	{#if translatedContent && language}
 		<button
 			class="text-[0.6rem] underline decoration-dashed mt-1 pr-4 text-right w-full text-slate-900/80 hover:text-slate-900/90"
 			on:click={switchContent}
 		>
-			translated from {message.language}
+			translated from {language}
 		</button>
 	{/if}
 </div>

@@ -3,6 +3,8 @@
 	import { PUBLIC_SOCKET_URL } from '$env/static/public';
 	import { onMount } from 'svelte';
 	import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
+	import { throttle } from 'lodash-es';
+
 	import MessageBubble from '../../../components/message-bubble.svelte';
 
 	const fish = `<><`;
@@ -11,9 +13,15 @@
 		id: string;
 		userId: string;
 		userName: string;
-		content: string;
+		content?: string;
 		translatedContent?: string;
-		language: string;
+		language?: string;
+	};
+
+	type QueueItem = {
+		id: string;
+		message?: Partial<Message>;
+		timestamp: string;
 	};
 
 	const LANGUAGE_OPTIONS = [
@@ -31,14 +39,15 @@
 	];
 
 	const roomId = $page.params.id;
-	let userId: string | undefined;
-	let userName: string | undefined;
+	let userId: string;
+	let userName: string;
 
 	let ws: WebSocket | undefined;
 
 	let selectedLanguage = 'english';
 
 	let messages: Message[] = [];
+	let messageQueue: QueueItem[] = [];
 
 	let isTalking = false;
 	let audioContext: AudioContext | undefined;
@@ -56,8 +65,6 @@
 			length: 2
 		});
 
-		console.log({ userName });
-
 		ws = new WebSocket(`wss://${PUBLIC_SOCKET_URL}/api/room/${roomId}/join`);
 
 		ws.addEventListener('open', () => {
@@ -67,40 +74,37 @@
 		ws.addEventListener('message', async (event) => {
 			const message = JSON.parse(event.data);
 			const existingMessage = messages.find(({ id }) => id === message.id);
+			const isCurrentUser = existingMessage?.userId === userId;
 
-			if (existingMessage?.userId === userId) {
+			if (isCurrentUser) {
 				return;
 			}
 
-			let translatedContent;
+			// Generate a queue item before doing any slow async calls
+			const queueItemId = crypto.randomUUID();
+			addQueueItem({ id: queueItemId, timestamp: new Date().toISOString() });
 
-			if (message.language !== selectedLanguage) {
+			let translatedContent;
+			const sourceLang = message.language || (await detectLanguage(message.content));
+
+			if (!isCurrentUser && sourceLang !== selectedLanguage) {
 				const body = new FormData();
 				body.append('text', message.content);
-				body.append('sourceLang', message.language);
+				body.append('sourceLang', sourceLang);
 				body.append('targetLang', selectedLanguage);
 				const response = await fetch('/api/translate', {
 					method: 'POST',
 					body
 				});
-				translatedContent = await response.text();
+				translatedContent = (await response.text()).trim();
 			}
 
-			if (existingMessage) {
-				const updatedContent: Partial<Message> = {
-					content: `${existingMessage.content} ${message.content}`
-				};
-
-				if (translatedContent) {
-					updatedContent.translatedContent = `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${translatedContent}`;
-				}
-
-				updateMessage(existingMessage.id, updatedContent);
-			} else {
-				addMessage({ ...message, translatedContent });
-			}
-
-			await generateVoice(translatedContent || message.content);
+			updateQueueItem(queueItemId, {
+				...message,
+				content: message.content || existingMessage?.content,
+				translatedContent,
+				language: sourceLang
+			});
 		});
 
 		ws.addEventListener('close', () => {
@@ -128,47 +132,37 @@
 			return;
 		}
 
+		// Generate a queue item before doing any slow async calls
+		const queueItemId = crypto.randomUUID();
+		addQueueItem({ id: queueItemId, timestamp: new Date().toISOString() });
+
 		const transcribeBody = new FormData();
 		transcribeBody.append('audio', audio, 'audio.wav');
 		const transcribeResponse = await fetch('/api/transcribe', {
 			method: 'POST',
 			body: transcribeBody
 		});
-		const content = await transcribeResponse.text();
+		const content = (await transcribeResponse.text()).trim();
 
 		// hack: quiet audio sometimes shows up as 'you' or 'MBC 뉴스 김정은입니다'
 		if (content === 'you' || content.includes('MBC 뉴스 김정은입니다')) {
+			removeQueueItem(queueItemId);
 			return;
 		}
 
-		const isExistingMessage = messages.find(({ id }) => id === messageId);
-
-		if (isExistingMessage) {
-			updateMessage(messageId, { content: `${isExistingMessage.content} ${content}` });
-		} else {
-			const detectBody = new FormData();
-			detectBody.append('message', content);
-			const detectResponse = await fetch('/api/detect', {
-				method: 'POST',
-				body: detectBody
-			});
-			const language = await detectResponse.text();
-
-			addMessage({
-				id: messageId,
-				userId,
-				userName,
-				content,
-				language
-			});
-		}
-
-		broadcastMessage(messageId, content);
+		updateQueueItem(queueItemId, { id: messageId, content });
 	}
 
 	async function handleStartTalking() {
 		isTalking = true;
 		const messageId = crypto.randomUUID();
+
+		// add the message so it'll exist once we start transcribing
+		addMessage({
+			id: messageId,
+			userId,
+			userName
+		});
 
 		audioContext = new AudioContext();
 		const microphoneMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -201,38 +195,91 @@
 		};
 	}
 
-	function addMessage(message: Message) {
+	const processQueue = throttle(async () => {
+		if (!messageQueue.length) {
+			return;
+		}
+
+		// Sort the queue
+		const q = [...messageQueue].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+		const queueItem = q[0];
+		if (!queueItem) {
+			return;
+		}
+
+		const { message } = queueItem;
+		if (message?.id && (message?.content || message?.translatedContent)) {
+			await updateMessage(message.id, message);
+			messageQueue = q.slice(1);
+		}
+
+		if (q.length) {
+			processQueue();
+		}
+	}, 1000);
+
+	async function detectLanguage(content: string) {
+		const detectBody = new FormData();
+		detectBody.append('message', content);
+
+		const detectResponse = await fetch('/api/detect', {
+			method: 'POST',
+			body: detectBody
+		});
+
+		return await detectResponse.text();
+	}
+
+	async function addMessage(message: Message) {
 		messages = [...messages, message];
 	}
 
-	function updateMessage(id: string, updatedMessage: Partial<Message>) {
-		messages = messages.map((message) =>
-			message.id === id ? { ...message, ...updatedMessage } : message
-		);
+	async function addQueueItem(item: QueueItem) {
+		messageQueue = [...messageQueue, item];
 	}
 
-	// This is a terrible hack because I don't have time to learn Svelte
-	// enough to properly maintain the messages array, sorry Rich
-	function combineMessages(messages: Message[]) {
-		const m = new Map<string, Message>();
+	async function removeQueueItem(itemId: string) {
+		messageQueue = messageQueue.filter(({ id }) => id !== itemId);
+	}
 
-		for (const message of messages) {
-			if (m.has(message.id)) {
-				const existingMessage = m.get(message.id)!;
+	async function updateQueueItem(itemId: string, message: Partial<Message>) {
+		messageQueue = messageQueue.map((item) => (item.id === itemId ? { ...item, message } : item));
+		processQueue();
+	}
 
-				// Merge content
-				existingMessage.content = `${existingMessage.content} ${message.content}`;
-				if (message.translatedContent) {
-					existingMessage.translatedContent = `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${message.translatedContent}`;
-				}
+	async function updateMessage(messageId: string, partialMessage: Partial<Message>) {
+		const existingMessage = messages.find(({ id }) => id === messageId);
 
-				m.set(message.id, existingMessage);
-			} else {
-				m.set(message.id, message);
-			}
+		// Messages should always exist because they are added
+		// when a user starts talking
+		if (!existingMessage) {
+			addMessage({ id: messageId, ...partialMessage } as Message);
+			return;
 		}
 
-		return Array.from(m.values());
+		// If there is content and it is my message then broadcast to the world!
+		if (partialMessage.content && existingMessage.userId === userId) {
+			broadcastMessage(messageId, partialMessage.content);
+		}
+
+		const updatedMessage: Partial<Message> = {
+			content: [existingMessage.content, partialMessage.content].filter(Boolean).join(' '),
+			translatedContent: [existingMessage.translatedContent, partialMessage.translatedContent]
+				.filter(Boolean)
+				.join(' ')
+		};
+
+		// Detect language if it hasn't already be saved
+		const content = partialMessage.content || existingMessage.content;
+
+		if (content && !existingMessage.language) {
+			updatedMessage.language = await detectLanguage(content);
+		}
+
+		messages = messages.map((message) =>
+			message.id === messageId ? { ...message, ...updatedMessage } : message
+		);
 	}
 
 	function broadcastMessage(messageId: string, content: string) {
@@ -330,8 +377,12 @@
 		{/if}
 
 		<div class="space-y-4 p-4">
-			{#each combineMessages(messages) as message}
-				<MessageBubble {message} isUser={message.userId === userId} />
+			{#each messages as message}
+				{#if message.content || message.translatedContent}
+					{#key message.content}
+						<MessageBubble {...message} isUser={message.userId === userId} />
+					{/key}
+				{/if}
 			{/each}
 		</div>
 	</div>
