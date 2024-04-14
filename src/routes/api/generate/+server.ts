@@ -1,14 +1,17 @@
-import { VOICE_API_KEY, VOICE_ID } from '$env/static/private';
+import { VOICE_API_KEY, VOICE_ID, VOICE_ID_CHINESE } from '$env/static/private';
 
 export async function POST({ request, platform }) {
 	const data = await request.formData();
 	const message = data.get('message');
+	const language = data.get('language');
 
 	if (!message) {
 		return new Response('Bad Request', { status: 400 });
 	}
+	const ID = language === 'zh' ? VOICE_ID_CHINESE : VOICE_ID;
 
-	const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
+	const url = `http://api.elevenlabs.io/v1/text-to-speech/${ID}`;
+	console.log(url, ID, language);
 	const headers = {
 		'Content-Type': 'application/json',
 		'xi-api-key': VOICE_API_KEY
