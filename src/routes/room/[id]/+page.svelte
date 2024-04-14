@@ -12,14 +12,7 @@
 		language: string;
 	};
 
-	const roomId = $page.params.id;
-	let userId: string | undefined;
-	let ws: WebSocket | undefined;
-	let chunks: any[] = [];
-	let mediaRecorder: MediaRecorder | undefined;
-	let selectedLanguage = 'english';
-	let messages: Message[] = [];
-	const languageOptions = [
+	const LANGUAGE_OPTIONS = [
 		'mandarin',
 		'spanish',
 		'english',
@@ -33,7 +26,21 @@
 		'german'
 	];
 
-	onMount(() => {
+	const roomId = $page.params.id;
+	let userId: string | undefined;
+
+	let ws: WebSocket | undefined;
+
+	let selectedLanguage = 'english';
+
+	let messages: Message[] = [];
+
+	let isTalking = false;
+	let audioContext: AudioContext | undefined;
+	let audioWorkletNode: AudioWorkletNode | undefined;
+	let microphoneMediaStreamSource: MediaStreamAudioSourceNode | undefined;
+
+	onMount(async () => {
 		userId = crypto.randomUUID();
 
 		ws = new WebSocket(`wss://${PUBLIC_SOCKET_URL}/api/room/${roomId}/join`);
@@ -44,29 +51,41 @@
 
 		ws.addEventListener('message', async (event) => {
 			const message = JSON.parse(event.data);
-			const messageExists = messages.find(({ id }) => id === message.id);
+			const existingMessage = messages.find(({ id }) => id === message.id);
 
-			if (!messageExists) {
-				let translatedContent;
-
-				if (message.language !== selectedLanguage) {
-					const body = new FormData();
-					body.append('text', message.content);
-					body.append('sourceLang', message.language);
-					body.append('targetLang', selectedLanguage);
-
-					const response = await fetch('/api/translate', {
-						method: 'POST',
-						body
-					});
-
-					translatedContent = await response.text();
-				}
-				const newMessage = { ...message, translatedContent };
-				messages = [...messages, newMessage];
-
-				await generateVoice(newMessage);
+			if (existingMessage?.userId === userId) {
+				return;
 			}
+
+			let translatedContent;
+
+			if (message.language !== selectedLanguage) {
+				const body = new FormData();
+				body.append('text', message.content);
+				body.append('sourceLang', message.language);
+				body.append('targetLang', selectedLanguage);
+				const response = await fetch('/api/translate', {
+					method: 'POST',
+					body
+				});
+				translatedContent = await response.text();
+			}
+
+			if (existingMessage) {
+				const updatedContent: Partial<Message> = {
+					content: `${existingMessage.content} ${message.content}`
+				};
+
+				if (translatedContent) {
+					updatedContent.translatedContent = `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${translatedContent}`;
+				}
+
+				updateMessage(existingMessage.id, updatedContent);
+			} else {
+				addMessage({ ...message, translatedContent });
+			}
+
+			await generateVoice(translatedContent || message.content);
 		});
 
 		ws.addEventListener('close', () => {
@@ -74,17 +93,14 @@
 		});
 	});
 
-	async function generateVoice(message: Message) {
-		const generatedMessage = message.translatedContent ?? message.content;
-		if (!generatedMessage) {
-			return;
-		}
+	async function generateVoice(content: string) {
 		const translatedContentBody = new FormData();
-		translatedContentBody.append('message', generatedMessage);
+		translatedContentBody.append('message', content);
 		const generateResponse = await fetch('/api/generate', {
 			method: 'POST',
 			body: translatedContentBody
 		});
+
 		const audioBlob = await generateResponse.blob();
 		const audioUrl = URL.createObjectURL(audioBlob);
 
@@ -92,7 +108,7 @@
 		audioElement.play();
 	}
 
-	async function transcribe(audio: Blob) {
+	async function transcribe(messageId: string, audio: Blob) {
 		if (!userId) {
 			return;
 		}
@@ -105,76 +121,144 @@
 		});
 		const content = await transcribeResponse.text();
 
-		const detectBody = new FormData();
-		detectBody.append('message', content);
-		const detectResponse = await fetch('/api/detect', {
-			method: 'POST',
-			body: detectBody
-		});
-		const language = await detectResponse.text();
-
-		const message: Message = {
-			id: crypto.randomUUID(),
-			userId,
-			userName: userId,
-			content,
-			language
-		};
-
-		messages = [...messages, message];
-
-		ws?.send(JSON.stringify(message));
-	}
-
-	async function startTalking() {
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-		chunks = [];
-		mediaRecorder = new MediaRecorder(stream);
-		mediaRecorder.start(1000);
-
-		mediaRecorder.addEventListener('dataavailable', (event) => {
-			chunks.push(event.data);
-		});
-	}
-
-	async function stopTalking() {
-		if (!mediaRecorder) {
+		// hack: quiet audio sometimes shows up as 'you' or 'MBC 뉴스 김정은입니다'
+		if (content === 'you' || content.includes('MBC 뉴스 김정은입니다')) {
 			return;
 		}
 
-		mediaRecorder.stop();
+		const isExistingMessage = messages.find(({ id }) => id === messageId);
 
-		mediaRecorder.addEventListener('stop', () => {
-			if (!chunks.length) {
-				return;
+		if (isExistingMessage) {
+			updateMessage(messageId, { content: `${isExistingMessage.content} ${content}` });
+		} else {
+			const detectBody = new FormData();
+			detectBody.append('message', content);
+			const detectResponse = await fetch('/api/detect', {
+				method: 'POST',
+				body: detectBody
+			});
+			const language = await detectResponse.text();
+
+			addMessage({
+				id: messageId,
+				userId,
+				userName: userId,
+				content,
+				language
+			});
+		}
+
+		broadcastMessage(messageId, content);
+	}
+
+	async function handleStartTalking() {
+		isTalking = true;
+		const messageId = crypto.randomUUID();
+
+		audioContext = new AudioContext();
+		const microphoneMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+		microphoneMediaStreamSource = audioContext.createMediaStreamSource(microphoneMediaStream);
+		await audioContext.audioWorklet.addModule('/worklet.js');
+
+		audioWorkletNode = new AudioWorkletNode(audioContext, 'worklet', {
+			processorOptions: {
+				sampleRate: audioContext.sampleRate
 			}
-
-			transcribe(new Blob(chunks, { type: 'audio/wav' }));
 		});
 
-		mediaRecorder = undefined;
+		microphoneMediaStreamSource.connect(audioWorkletNode).connect(audioContext.destination);
+
+		audioWorkletNode.port.onmessage = (event) => {
+			switch (event.data.type) {
+				case 'log':
+					console.log(`[WORKLET]: ${event.data.message}`);
+					break;
+				case 'bytes':
+					transcribe(messageId, new Blob([event.data.bytes], { type: 'audio/wav' }));
+					break;
+				case 'stop':
+					handleStopTalking();
+					break;
+				default:
+					console.error(`Unhandled worklet message type ${event.data.type}`);
+			}
+		};
+	}
+
+	function addMessage(message: Message) {
+		messages = [...messages, message];
+	}
+
+	function updateMessage(id: string, updatedMessage: Partial<Message>) {
+		messages = messages.map((message) =>
+			message.id === id ? { ...message, ...updatedMessage } : message
+		);
+	}
+
+	// This is a terrible hack because I don't have time to learn Svelte
+	// enough to properly maintain the messages array, sorry Rich
+	function combineMessages(messages: Message[]) {
+		const m = new Map<string, Message>();
+
+		for (const message of messages) {
+			if (m.has(message.id)) {
+				const existingMessage = m.get(message.id)!;
+
+				// Merge content
+				existingMessage.content = `${existingMessage.content} ${message.content}`;
+				if (message.translatedContent) {
+					existingMessage.translatedContent = `${existingMessage.translatedContent ? existingMessage.translatedContent + ' ' : ''}${message.translatedContent}`;
+				}
+
+				m.set(message.id, existingMessage);
+			} else {
+				m.set(message.id, message);
+			}
+		}
+
+		return Array.from(m.values());
+	}
+
+	function broadcastMessage(messageId: string, content: string) {
+		const messageToSend = messages.find(({ id }) => id === messageId);
+		if (messageToSend) {
+			ws?.send(JSON.stringify({ id: messageToSend.id, content, language: messageToSend.language }));
+		}
+	}
+
+	async function handleStopTalking() {
+		if (!audioContext || !audioWorkletNode || !microphoneMediaStreamSource) {
+			return;
+		}
+
+		audioWorkletNode.disconnect(audioContext.destination);
+		microphoneMediaStreamSource.disconnect(audioWorkletNode);
+
+		audioContext = undefined;
+		audioWorkletNode = undefined;
+		isTalking = false;
 	}
 </script>
 
 <h1 class="text-3xl font-bold">babel fish</h1>
 
 <select bind:value={selectedLanguage}>
-	{#each languageOptions as language}
+	{#each LANGUAGE_OPTIONS as language}
 		<option>{language}</option>
 	{/each}
 </select>
 
-{#if mediaRecorder === undefined}
-	<button on:click={startTalking}>start talking</button>
+{#if !isTalking}
+	<button on:click={handleStartTalking}>start talking</button>
 {:else}
-	<button on:click={stopTalking}>stop talking</button>
+	<button on:click={handleStopTalking}>stop talking</button>
 {/if}
 
 <div>
-	{#each messages as message}
+	{#each combineMessages(messages) as message}
 		<div>
-			<div>{message.userId} - {message.userName}</div>
+			<div>{message.id}</div>
 			<div>{message.translatedContent ?? message.content}</div>
 		</div>
 	{/each}
