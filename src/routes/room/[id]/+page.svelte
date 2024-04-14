@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { PUBLIC_SOCKET_URL } from '$env/static/public';
 	import { onMount } from 'svelte';
+	import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
 	import MessageBubble from '../../../components/message-bubble.svelte';
 
 	const fish = `<><`;
@@ -31,6 +32,7 @@
 
 	const roomId = $page.params.id;
 	let userId: string | undefined;
+	let userName: string | undefined;
 
 	let ws: WebSocket | undefined;
 
@@ -45,6 +47,14 @@
 
 	onMount(async () => {
 		userId = crypto.randomUUID();
+		userName = uniqueNamesGenerator({
+			dictionaries: [colors, adjectives, animals],
+			style: 'capital',
+			separator: '',
+			length: 2
+		});
+
+		console.log({ userName });
 
 		ws = new WebSocket(`wss://${PUBLIC_SOCKET_URL}/api/room/${roomId}/join`);
 
@@ -112,7 +122,7 @@
 	}
 
 	async function transcribe(messageId: string, audio: Blob) {
-		if (!userId) {
+		if (!userId || !userName) {
 			return;
 		}
 
@@ -145,7 +155,7 @@
 			addMessage({
 				id: messageId,
 				userId,
-				userName: userId,
+				userName,
 				content,
 				language
 			});
@@ -226,7 +236,15 @@
 	function broadcastMessage(messageId: string, content: string) {
 		const messageToSend = messages.find(({ id }) => id === messageId);
 		if (messageToSend) {
-			ws?.send(JSON.stringify({ id: messageToSend.id, content, language: messageToSend.language }));
+			ws?.send(
+				JSON.stringify({
+					id: messageToSend.id,
+					userId,
+					userName,
+					content,
+					language: messageToSend.language
+				})
+			);
 		}
 	}
 

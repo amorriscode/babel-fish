@@ -37,6 +37,7 @@
 	"dependencies": {
 		"@fontsource/press-start-2p": "^5.0.19",
 		"@fontsource/vt323": "^5.0.12",
-		"dedent": "^1.5.3"
+		"dedent": "^1.5.3",
+		"unique-names-generator": "^4.7.1"
 	}
 }
