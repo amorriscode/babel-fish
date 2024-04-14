@@ -20,6 +20,8 @@ Built with:
 
 ## 🛠️ Development
 
+> Note: `wrangler` is used to run the dev server so we have access to Cloudflare Workers AI
+
 1. Create an `.env` file and fill in the variables
 
     `cp .env.example .env`
@@ -32,6 +34,6 @@ Built with:
 
     `npm install`
 
-4. Run the dev server
+4. Run the wrangler dev server
 
     `npm run wdev`
