@@ -1,6 +1,4 @@
 <script lang="ts">
-	export let id: string;
-	export let userId: string;
 	export let userName: string;
 	export let content: string | undefined = undefined;
 	export let translatedContent: string | undefined = undefined;
