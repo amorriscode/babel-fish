@@ -3,6 +3,8 @@
 	import { PUBLIC_SOCKET_URL } from '$env/static/public';
 	import { onMount } from 'svelte';
 
+	const fish = `<><`;
+
 	type Message = {
 		id: string;
 		userId: string;
@@ -241,25 +243,49 @@
 	}
 </script>
 
-<h1 class="text-3xl font-bold">babel fish</h1>
+<div class="p-4 flex justify-between">
+	<h1 class="text-2xl">babel_fish</h1>
 
-<select bind:value={selectedLanguage}>
-	{#each LANGUAGE_OPTIONS as language}
-		<option id={language.value}>{language.label}</option>
-	{/each}
-</select>
+	<div class="flex items-center gap-4">
+		<div>get responses in</div>
+		<select bind:value={selectedLanguage} class="text-sm p-2">
+			{#each LANGUAGE_OPTIONS as language}
+				<option id={language.value}>{language.label}</option>
+			{/each}
+		</select>
+	</div>
+</div>
 
-{#if !isTalking}
-	<button on:click={handleStartTalking}>start talking</button>
-{:else}
-	<button on:click={handleStopTalking}>stop talking</button>
-{/if}
+<div class="flex w-full">
+	{#if !isTalking}
+		<button
+			on:click={handleStartTalking}
+			class="bg-rose-500 hover:bg-rose-600 text-4xl p-4 text-white w-full">start talking</button
+		>
+	{:else}
+		<button
+			on:click={handleStopTalking}
+			class="bg-purple-500 hover:bg-purple-600 text-4xl p-4 text-white w-full">stop talking</button
+		>
+	{/if}
+</div>
 
 <div>
-	{#each combineMessages(messages) as message}
-		<div>
-			<div>{message.id}</div>
-			<div>{message.translatedContent ?? message.content}</div>
+	{#if !messages.length}
+		<div class="w-2/3 mx-auto text-center mt-20 text-6xl tracking-[-0.5em]">
+			{fish}
 		</div>
-	{/each}
+		<div class="w-2/3 mx-auto text-center mt-8 text-2xl">
+			It's lonely in here. Why don't you say something?
+		</div>
+	{/if}
+
+	<div class="space-y-4 p-4">
+		{#each combineMessages(messages) as message}
+			<div class="bg-white w-fit max-w-1/3 p-4">
+				<div>{message.id}</div>
+				<div>{message.translatedContent ?? message.content}</div>
+			</div>
+		{/each}
+	</div>
 </div>
